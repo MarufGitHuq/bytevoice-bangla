@@ -33,7 +33,7 @@ function plainText(text: string) {
 export default defineAgent({
   entry: async (ctx) => {
     const startedAt = Date.now();
-    const callId = await startCall(ctx.room.name ?? `room-${startedAt}`, {
+    const callId = await startCall(ctx.job.room?.name ?? ctx.room.name ?? `room-${startedAt}`, {
       stt: `${STT_MODEL}:${STT_LANGUAGE}`,
       llm: LLM_MODEL,
       tts: `${TTS_MODEL}:${TTS_VOICE}`,
