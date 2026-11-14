@@ -3,19 +3,21 @@
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
-import type { TrackReferenceOrPlaceholder } from '@livekit/components-react';
-import { type AgentState, useTrackVolume } from '@livekit/components-react';
-import { cn } from '@/lib/shadcn/utils';
 
-// Audio-reactive orb. The agent's voice level drives a vertex shader that
-// displaces an icosphere along its normals with 3D simplex noise; the agent's
-// state (listening / thinking / speaking) drives colour and motion speed.
+// The 3D orb in the hero. A vertex shader pushes an icosphere's surface out
+// along its normals with 3D simplex noise. The call's state sets colour and
+// speed; the receptionist's voice level (0..1) makes the surface swell while
+// she speaks. Loaded only in the browser, and only when WebGL works (see
+// hero-orb.tsx).
 
-const STATE_LOOK: Record<string, { color: string; speed: number; base: number }> = {
-  listening: { color: '#5559ee', speed: 0.35, base: 0.06 },
-  thinking: { color: '#3b82f6', speed: 1.4, base: 0.12 },
-  speaking: { color: '#8f92ff', speed: 0.7, base: 0.08 },
-  idle: { color: '#3d41d8', speed: 0.3, base: 0.07 },
+export type OrbLook = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking';
+
+const LOOKS: Record<OrbLook, { color: string; speed: number; base: number }> = {
+  idle: { color: '#0d9488', speed: 0.3, base: 0.07 },
+  connecting: { color: '#0891b2', speed: 1.1, base: 0.1 },
+  listening: { color: '#14b8a6', speed: 0.35, base: 0.06 },
+  thinking: { color: '#0284c7', speed: 1.4, base: 0.12 },
+  speaking: { color: '#2dd4bf', speed: 0.7, base: 0.08 },
 };
 
 const vertexShader = /* glsl */ `
@@ -90,18 +92,20 @@ const fragmentShader = /* glsl */ `
   void main() {
     // Fresnel rim: brighter where the surface turns away from the camera.
     float rim = pow(1.0 - abs(dot(vNormal, vec3(0.0, 0.0, 1.0))), 2.2);
-    vec3 core = uColor * (0.35 + vDisplacement * 1.6);
-    vec3 glow = mix(uColor, vec3(1.0), 0.55) * rim * (0.9 + uLevel * 1.5);
+    vec3 core = uColor * (0.8 + vDisplacement * 2.0);
+    vec3 glow = mix(uColor, vec3(1.0), 0.55) * rim * (1.3 + uLevel * 1.5);
     gl_FragColor = vec4(core + glow, 1.0);
   }
 `;
 
-interface OrbMeshProps {
+interface OrbProps {
+  look: OrbLook;
   level: number;
-  state?: AgentState;
+  /** prefers-reduced-motion: keep the shape, drop the drifting and spinning. */
+  still: boolean;
 }
 
-function OrbMesh({ level, state }: OrbMeshProps) {
+function OrbMesh({ look, level, still }: OrbProps) {
   const mesh = useRef<THREE.Mesh>(null);
   const smoothed = useRef(0);
   const clock = useRef(0);
@@ -112,25 +116,26 @@ function OrbMesh({ level, state }: OrbMeshProps) {
       uTime: { value: 0 },
       uLevel: { value: 0 },
       uBase: { value: 0.05 },
-      uColor: { value: new THREE.Color(STATE_LOOK.idle.color) },
+      uColor: { value: new THREE.Color(LOOKS.idle.color) },
     }),
     []
   );
 
   useFrame((_, delta) => {
-    const look = STATE_LOOK[state ?? 'idle'] ?? STATE_LOOK.idle;
+    const style = LOOKS[look];
+    const motion = still ? 0 : 1;
 
     // Ease toward the live audio level so the surface moves, not jitters.
     smoothed.current += (level - smoothed.current) * Math.min(1, delta * 12);
-    clock.current += delta * look.speed;
+    clock.current += delta * style.speed * motion;
 
     uniforms.uTime.value = clock.current;
     uniforms.uLevel.value = smoothed.current;
-    uniforms.uBase.value += (look.base - uniforms.uBase.value) * Math.min(1, delta * 4);
-    uniforms.uColor.value.lerp(targetColor.set(look.color), Math.min(1, delta * 4));
+    uniforms.uBase.value += (style.base - uniforms.uBase.value) * Math.min(1, delta * 4);
+    uniforms.uColor.value.lerp(targetColor.set(style.color), Math.min(1, delta * 4));
 
     if (mesh.current) {
-      mesh.current.rotation.y += delta * 0.15;
+      mesh.current.rotation.y += delta * 0.15 * motion;
       mesh.current.scale.setScalar(1 + smoothed.current * 0.12);
     }
   });
@@ -147,21 +152,15 @@ function OrbMesh({ level, state }: OrbMeshProps) {
   );
 }
 
-interface VoiceOrbProps {
-  state?: AgentState;
-  audioTrack?: TrackReferenceOrPlaceholder;
-  className?: string;
-}
-
-export function VoiceOrb({ state, audioTrack, className }: VoiceOrbProps) {
-  // 0..1 loudness of the agent's audio track, sampled by LiveKit's analyser.
-  const level = useTrackVolume(audioTrack as Parameters<typeof useTrackVolume>[0]);
-
+export default function VoiceOrb(props: OrbProps) {
   return (
-    <div className={cn('size-[300px] md:size-[450px]', className)}>
-      <Canvas camera={{ position: [0, 0, 3.2], fov: 45 }} dpr={[1, 1.5]} gl={{ antialias: true }}>
-        <OrbMesh level={level} state={state} />
-      </Canvas>
-    </div>
+    <Canvas
+      camera={{ position: [0, 0, 3.2], fov: 45 }}
+      dpr={[1, 1.5]}
+      gl={{ antialias: true, alpha: true }}
+      aria-hidden="true"
+    >
+      <OrbMesh {...props} />
+    </Canvas>
   );
 }
