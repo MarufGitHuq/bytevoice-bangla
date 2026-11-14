@@ -90,23 +90,37 @@ export interface Extraction {
   notes?: string | undefined;
 }
 
-/** Merges newly learned fields into the call's extraction; never erases a known field. */
-export async function saveExtraction(callId: string, fields: Extraction) {
+/**
+ * Merges newly learned fields into the call's extraction; never erases a known field.
+ *
+ * `prefer` says which value wins when a field is already known:
+ * - 'new' (default): used by the tools, whose values were validated in code.
+ * - 'existing': used by the end-of-call summary, which only fills the gaps.
+ */
+export async function saveExtraction(callId: string, fields: Extraction, prefer: 'new' | 'existing' = 'new') {
+  const columns = [
+    'patient_name',
+    'phone',
+    'phone_valid',
+    'reason_for_visit',
+    'preferred_date',
+    'preferred_time',
+    'doctor',
+    'intent',
+    'notes',
+  ];
+  // Column names come from the fixed list above, never from input.
+  const merge = columns
+    .map((c) =>
+      prefer === 'new'
+        ? `${c} = coalesce(excluded.${c}, call_extractions.${c})`
+        : `${c} = coalesce(call_extractions.${c}, excluded.${c})`,
+    )
+    .join(', ');
   await db().query(
-    `insert into call_extractions
-       (call_id, patient_name, phone, phone_valid, reason_for_visit, preferred_date, preferred_time, doctor, intent, notes)
+    `insert into call_extractions (call_id, ${columns.join(', ')})
      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-     on conflict (call_id) do update set
-       patient_name     = coalesce(excluded.patient_name, call_extractions.patient_name),
-       phone            = coalesce(excluded.phone, call_extractions.phone),
-       phone_valid      = coalesce(excluded.phone_valid, call_extractions.phone_valid),
-       reason_for_visit = coalesce(excluded.reason_for_visit, call_extractions.reason_for_visit),
-       preferred_date   = coalesce(excluded.preferred_date, call_extractions.preferred_date),
-       preferred_time   = coalesce(excluded.preferred_time, call_extractions.preferred_time),
-       doctor           = coalesce(excluded.doctor, call_extractions.doctor),
-       intent           = coalesce(excluded.intent, call_extractions.intent),
-       notes            = coalesce(excluded.notes, call_extractions.notes),
-       updated_at       = now()`,
+     on conflict (call_id) do update set ${merge}, updated_at = now()`,
     [
       callId,
       fields.patientName ?? null,

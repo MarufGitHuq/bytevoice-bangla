@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { LLM_MODEL, createAgent } from './agent.ts';
 import { CLINIC } from './clinic.ts';
 import { finalStatus, newCallState } from './outcome.ts';
-import { addTurn, endCall, startCall } from './store.ts';
+import { addTurn, endCall, saveExtraction, startCall } from './store.ts';
+import { type Turn, summariseCall } from './summary.ts';
 
 dotenv.config({ path: '.env.local' });
 
@@ -57,6 +58,7 @@ export default defineAgent({
     // Every finished turn is written as it happens, so a dropped call still
     // leaves a complete transcript up to that point.
     let seq = 0;
+    const turns: Turn[] = [];
     let callerTurns = 0;
     let writes: Promise<unknown> = Promise.resolve();
     session.on(voice.AgentSessionEventTypes.ConversationItemAdded, (event) => {
@@ -67,6 +69,7 @@ export default defineAgent({
       const speaker = item.role === 'user' ? 'caller' : 'agent';
       if (speaker === 'caller') callerTurns += 1;
       const turn = (seq += 1);
+      turns.push({ speaker, text });
       const offsetMs = (event.createdAt ?? Date.now()) - startedAt;
       // Chained so turns are stored in order and a failed write never breaks the call.
       writes = writes
@@ -79,9 +82,19 @@ export default defineAgent({
       if (closed) return;
       closed = true;
       await writes;
-      await endCall(callId, { status: finalStatus(state, callerTurns, failed), error }).catch((e) =>
-        console.error('could not close call record', e),
-      );
+      // One model call writes the summary and fills in details no tool saved.
+      const summary = await summariseCall(turns);
+      if (summary) {
+        await saveExtraction(callId, summary.extraction, 'existing').catch((e) =>
+          console.error('could not store extraction', e),
+        );
+      }
+      await endCall(callId, {
+        status: finalStatus(state, callerTurns, failed),
+        summaryBn: summary?.summaryBn,
+        summaryEn: summary?.summaryEn,
+        error,
+      }).catch((e) => console.error('could not close call record', e));
     };
     session.on(voice.AgentSessionEventTypes.Close, (event) => {
       void finish(Boolean(event.error), event.error ? String(event.error) : undefined);

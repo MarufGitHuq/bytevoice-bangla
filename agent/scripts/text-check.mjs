@@ -16,6 +16,7 @@ import pg from 'pg';
 const { createAgent } = await import('../src/agent.ts');
 const { finalStatus, newCallState } = await import('../src/outcome.ts');
 const store = await import('../src/store.ts');
+const { summariseCall } = await import('../src/summary.ts');
 
 initializeLogger({ pretty: false, level: 'error' });
 
@@ -72,10 +73,12 @@ async function runCall(name, turns) {
 
   const toolCalls = [];
   const replies = [];
+  const transcript = [];
   let seq = 0;
   for (const userInput of turns) {
     console.log(`\nCALLER: ${userInput}`);
     await store.addTurn(callId, (seq += 1), 'caller', userInput, seq * 1000);
+    transcript.push({ speaker: 'caller', text: userInput });
     try {
       const result = await session.run({ userInput }).wait();
       for (const event of result.events ?? []) {
@@ -90,6 +93,7 @@ async function runCall(name, turns) {
           if (text !== undefined && item.role === 'assistant') {
             const reply = Array.isArray(text) ? text.join(' ') : String(text);
             replies.push(reply);
+            transcript.push({ speaker: 'agent', text: reply });
             await store.addTurn(callId, (seq += 1), 'agent', reply, seq * 1000);
             console.log(`  AGENT: ${clip(reply)}`);
           }
@@ -101,9 +105,14 @@ async function runCall(name, turns) {
   }
   await session.close();
   const status = finalStatus(state, turns.length, false);
-  await store.endCall(callId, { status });
+  // Same steps as the end of a real call (see finish() in src/main.ts).
+  const summary = await summariseCall(transcript);
+  if (summary) await store.saveExtraction(callId, summary.extraction, 'existing');
+  await store.endCall(callId, { status, summaryBn: summary?.summaryBn, summaryEn: summary?.summaryEn });
+  console.log(`\n  summary (bn): ${summary?.summaryBn ?? 'none'}`);
+  console.log(`  summary (en): ${summary?.summaryEn ?? 'none'}`);
   console.log(`\n  call filed as: ${status}`);
-  return { toolCalls, replies, status };
+  return { callId, toolCalls, replies, status, summary };
 }
 
 const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -121,6 +130,9 @@ const appointment = async () =>
     )
   ).rows[0];
 
+const extraction = async (callId) =>
+  (await db.query(`select patient_name, phone, phone_valid, intent from call_extractions where call_id = $1`, [callId])).rows[0];
+
 const checks = [];
 const check = (label, ok) => checks.push([label, Boolean(ok)]);
 const hasBangla = (text) => /[ঀ-৿]/.test(text);
@@ -136,6 +148,9 @@ if (!only || only === 'book') {
   check('book: appointment stored as booked', a?.status === 'booked');
   check('book: slot is 18:00 on a Sunday', a && a.local.getUTCHours() === 18 && a.local.getUTCDay() === 0);
   check('book: call filed as booked', r.status === 'booked');
+  const e = await extraction(r.callId);
+  check('book: summary written in Bangla and English', r.summary && hasBangla(r.summary.summaryBn) && !hasBangla(r.summary.summaryEn));
+  check('book: summary did not overwrite validated details', e?.phone === TEST_PHONE && e?.phone_valid === true && e?.intent === 'book');
   check('book: replies are in Bangla', r.replies.every(hasBangla));
   check('book: no digits in spoken replies', !r.replies.some(hasDigits));
 }
@@ -163,6 +178,8 @@ if (!only || only === 'refuse') {
   const r = await runCall('refuse', scenarios.refuse);
   check('refuse: no booking tool used', !r.toolCalls.includes('bookAppointment'));
   check('refuse: no medicine named for the antibiotic question', !/অ্যামোক্সিসিলিন|এমোক্সিসিলিন|মেট্রোনিডাজল|amoxicillin|metronidazole/i.test(r.replies[0] ?? ''));
+  const e = await extraction(r.callId);
+  check('refuse: call with no tool still has a summary and an intent', r.summary && Boolean(e?.intent));
   check('refuse: replies are in Bangla', r.replies.every(hasBangla));
 }
 
