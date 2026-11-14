@@ -1,5 +1,5 @@
 {
-  "name": "agent-starter-react",
+  "name": "bytevoice-web",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -11,8 +11,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "shadcn:install": "pnpm dlx shadcn@latest add --yes @agents-ui/all && pnpm format"
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@livekit/components-react": "^2.9.24",
