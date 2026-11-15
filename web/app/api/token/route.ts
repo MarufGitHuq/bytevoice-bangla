@@ -7,8 +7,10 @@
 //   never taken from the request, so a token cannot join someone else's call
 //   or start a different agent;
 // - the token expires after a few minutes, so it cannot be saved and reused;
-// - a small per-IP limit slows down scripted requests. It lives in memory, so on
-//   Vercel each server instance counts on its own; it is a speed bump, not a wall.
+// - a per-IP limit and an overall limit slow down scripted requests. They live
+//   in memory, so on Vercel each server instance counts on its own: a speed
+//   bump, not a wall. The LiveKit free plan's own concurrency limit is the hard
+//   ceiling on how many calls can run at once.
 import { NextResponse } from 'next/server';
 import { AccessToken, RoomAgentDispatch, RoomConfiguration } from 'livekit-server-sdk';
 import { randomUUID } from 'node:crypto';
@@ -16,17 +18,60 @@ import { randomUUID } from 'node:crypto';
 export const dynamic = 'force-dynamic';
 
 const TOKEN_TTL = '5m';
-const LIMIT_PER_WINDOW = 10;
 const WINDOW_MS = 10 * 60 * 1000;
+// Opening the page fetches one token in advance and each call fetches one
+// more, so 20 per IP leaves room for a person testing several calls.
+const PER_IP_LIMIT = 20;
+const OVERALL_LIMIT = 200;
 
-const recentRequests = new Map<string, number[]>();
+// Only granted requests are recorded, so these stay small: the map holds at
+// most OVERALL_LIMIT addresses with recent requests, and each list at most
+// PER_IP_LIMIT times. Addresses with nothing recent are removed on every call.
+const grantedByIp = new Map<string, number[]>();
+let grantedAll: number[] = [];
 
-function isRateLimited(ip: string): boolean {
+function allowRequest(ip: string): boolean {
   const now = Date.now();
-  const recent = (recentRequests.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);
-  recent.push(now);
-  recentRequests.set(ip, recent);
-  return recent.length > LIMIT_PER_WINDOW;
+  const isRecent = (time: number) => now - time < WINDOW_MS;
+
+  grantedAll = grantedAll.filter(isRecent);
+  for (const [key, times] of grantedByIp) {
+    const recent = times.filter(isRecent);
+    if (recent.length === 0) grantedByIp.delete(key);
+    else grantedByIp.set(key, recent);
+  }
+
+  const mine = grantedByIp.get(ip) ?? [];
+  if (mine.length >= PER_IP_LIMIT || grantedAll.length >= OVERALL_LIMIT) return false;
+
+  grantedByIp.set(ip, [...mine, now]);
+  grantedAll.push(now);
+  return true;
+}
+
+// Vercel's edge sets x-real-ip (and overwrites x-forwarded-for) with the
+// address it saw, so a visitor cannot pick their own. The x-forwarded-for
+// fallback is only for running locally.
+function clientIp(req: Request): string {
+  return (
+    req.headers.get('x-real-ip') ??
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    'unknown'
+  );
+}
+
+// True when the request comes from a page on another site. Scripts can still
+// call the route directly; this only stops other websites from using it
+// through their visitors' browsers.
+function isCrossSite(req: Request): boolean {
+  const origin = req.headers.get('origin');
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host');
+  if (!origin || !host) return false;
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return true; // "null" or a malformed origin
+  }
 }
 
 function error(message: string, status: number) {
@@ -42,15 +87,10 @@ export async function POST(req: Request) {
     return error('Voice calls are not configured on this server.', 500);
   }
 
-  // Only this site may ask for tokens. Browsers always send Origin on a POST.
-  const origin = req.headers.get('origin');
-  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host');
-  if (origin && host && new URL(origin).host !== host) {
+  if (isCrossSite(req)) {
     return error('Forbidden', 403);
   }
-
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'local';
-  if (isRateLimited(ip)) {
+  if (!allowRequest(clientIp(req))) {
     return error('Too many calls. Please wait a few minutes.', 429);
   }
 

@@ -83,13 +83,18 @@ export function useCall() {
   const [error, setError] = useState<CallErrorKind | null>(null);
   const [seconds, setSeconds] = useState(0);
 
+  const showError = useCallback((kind: CallErrorKind) => {
+    setError(kind);
+    setPhase('error');
+  }, []);
+
+  // Shows the error and hangs up whatever part of the call had connected.
   const fail = useCallback(
     (kind: CallErrorKind) => {
-      setError(kind);
-      setPhase('error');
+      showError(kind);
       end().catch(() => {});
     },
-    [end]
+    [showError, end]
   );
 
   const startCall = useCallback(async () => {
@@ -100,9 +105,12 @@ export function useCall() {
       await checkMicrophone();
       await start();
     } catch (err) {
-      fail(errorKind(err));
+      // Our own errors (microphone, token) happen before anything connects,
+      // so there is nothing to hang up.
+      if (err instanceof CallError) showError(err.kind);
+      else fail(errorKind(err));
     }
-  }, [start, fail]);
+  }, [start, showError, fail]);
 
   const endCall = useCallback(() => {
     setPhase('ended');
