@@ -2,6 +2,7 @@
 // Search and filter are a plain GET form, so the URL holds the current view
 // (?q=...&status=...) and the page needs no client-side JavaScript.
 import Link from 'next/link';
+import { ChevronRight } from 'lucide-react';
 import { StatusBadge } from '@/components/portal/status-badge';
 import { CALL_STATUSES, getOverview, isCallStatus, listCalls, listOpenCallbacks } from '@/lib/db';
 import { STATUS_LABELS, formatDateTime, formatDuration } from '@/lib/portal-format';
@@ -123,6 +124,7 @@ export default async function CallsPage({
         <p className="text-sm text-slate-600">
           {calls.length} {calls.length === 1 ? 'call' : 'calls'}
           {filtered ? (calls.length === 1 ? ' matches' : ' match') : ''}. Times are Dhaka time.
+          Select a call to open its transcript and details.
         </p>
 
         {calls.length === 0 ? (
@@ -141,11 +143,14 @@ export default async function CallsPage({
                     <th className="px-4 py-3">Duration</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3">Summary</th>
+                    <th className="px-4 py-3">
+                      <span className="sr-only">Open</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {calls.map((call) => (
-                    <tr key={call.id} className="group relative hover:bg-slate-50">
+                    <tr key={call.id} className="group relative cursor-pointer hover:bg-teal-50/60">
                       <td className="px-4 py-3 whitespace-nowrap">
                         {/* The link covers the whole row (after:inset-0). */}
                         <Link
@@ -167,6 +172,12 @@ export default async function CallsPage({
                       <td className="max-w-xs px-4 py-3 text-slate-600">
                         <span className="line-clamp-2">{call.summaryEn ?? '—'}</span>
                       </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-0.5 text-sm font-medium text-teal-700">
+                          View
+                          <ChevronRight className="size-4" aria-hidden="true" />
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -185,8 +196,14 @@ export default async function CallsPage({
                       <Caller name={call.callerName} phone={call.callerPhone} />
                       <StatusBadge status={call.status} />
                     </div>
-                    <p className="mt-2 text-sm text-slate-600">
-                      {formatDateTime(call.startedAt)} · {formatDuration(call.durationS)}
+                    <p className="mt-2 flex items-center justify-between gap-3 text-sm text-slate-600">
+                      <span>
+                        {formatDateTime(call.startedAt)} · {formatDuration(call.durationS)}
+                      </span>
+                      <span className="inline-flex shrink-0 items-center gap-0.5 font-medium text-teal-700">
+                        View
+                        <ChevronRight className="size-4" aria-hidden="true" />
+                      </span>
                     </p>
                   </Link>
                 </li>
@@ -208,8 +225,12 @@ function Stat({ label, value, href }: { label: string; value: number; href?: str
   );
   const cls = 'block rounded-xl border border-slate-200 bg-white p-4';
   return href ? (
-    <Link href={href} className={`${cls} hover:border-teal-300`}>
+    <Link href={href} className={`${cls} hover:border-teal-300 hover:bg-teal-50/40`}>
       {body}
+      <p className="mt-2 inline-flex items-center gap-0.5 text-xs font-medium text-teal-700">
+        Show these calls
+        <ChevronRight className="size-3.5" aria-hidden="true" />
+      </p>
     </Link>
   ) : (
     <div className={cls}>{body}</div>

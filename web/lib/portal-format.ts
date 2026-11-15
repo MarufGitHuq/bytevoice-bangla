@@ -111,3 +111,45 @@ export const INTENT_LABELS: Record<string, string> = {
   callback: 'Callback',
   other: 'Other',
 };
+
+/**
+ * A calendar file (.ics) for one appointment, as a link the browser can
+ * download. Staff open it to put the visit in the doctor's calendar (Google,
+ * Outlook and Apple calendars all read this format). It is built from data
+ * already on the page, so no email or SMS service is involved.
+ */
+export function appointmentCalendarLink(a: {
+  reference: string;
+  doctor: string;
+  reason: string | null;
+  slotStart: Date;
+  patientName: string;
+  patientPhone: string;
+}): string {
+  // Calendar files give times in UTC as 20261115T100000Z.
+  const stamp = (d: Date) =>
+    d
+      .toISOString()
+      .replace(/[-:]/g, '')
+      .replace(/\.\d{3}/, '');
+  // Commas, semicolons and line breaks have a meaning in the format.
+  const text = (value: string) => value.replace(/([\;,])/g, '\$1').replace(/\r?\n/g, ' ');
+  const start = new Date(a.slotStart);
+  const end = new Date(start.getTime() + 45 * 60_000);
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Dhaka Dental Care//Staff portal//EN',
+    'BEGIN:VEVENT',
+    `UID:${a.reference}@dhaka-dental-care.demo`,
+    `DTSTAMP:${stamp(new Date())}`,
+    `DTSTART:${stamp(start)}`,
+    `DTEND:${stamp(end)}`,
+    `SUMMARY:${text(`${a.patientName} (${a.reason ?? 'visit'})`)}`,
+    `DESCRIPTION:${text(`Patient: ${a.patientName}, ${a.patientPhone}. Doctor: ${doctorName(a.doctor)}. Booking reference ${a.reference}. Booked by phone through ByteVoice.`)}`,
+    'LOCATION:Dhaka Dental Care',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
+}

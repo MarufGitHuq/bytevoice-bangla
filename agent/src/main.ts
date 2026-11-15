@@ -2,7 +2,7 @@ import { ServerOptions, cli, defineAgent, inference, voice } from '@livekit/agen
 import { EnhancerModel, audioEnhancement } from '@livekit/plugins-ai-coustics';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
-import { LLM_MODEL, createAgent } from './agent.ts';
+import { LLM_MODEL, type ProgressEvent, createAgent } from './agent.ts';
 import { CLINIC } from './clinic.ts';
 import { finalStatus, newCallState } from './outcome.ts';
 import { addTurn, endCall, saveExtraction, startCall } from './store.ts';
@@ -77,6 +77,15 @@ export default defineAgent({
         .catch((error) => console.error('could not store transcript turn', error));
     });
 
+    // Tells the caller's browser which steps are done (see ProgressEvent). The
+    // page listens on this topic. A lost message only affects the display.
+    const report = (event: ProgressEvent) => {
+      const payload = new TextEncoder().encode(JSON.stringify(event));
+      ctx.room.localParticipant
+        ?.publishData(payload, { reliable: true, topic: 'call-progress' })
+        .catch((error) => console.error('could not send progress to the page', error));
+    };
+
     let closed = false;
     const finish = async (failed: boolean, error?: string) => {
       if (closed) return;
@@ -102,7 +111,7 @@ export default defineAgent({
     ctx.addShutdownCallback(() => finish(false));
 
     await session.start({
-      agent: createAgent(state),
+      agent: createAgent(state, report),
       room: ctx.room,
       inputOptions: {
         // Removes background noise and other voices from the caller's audio.

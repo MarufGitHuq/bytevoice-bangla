@@ -34,6 +34,33 @@ export interface CallState {
   startedBooking: boolean;
 }
 
+/**
+ * A step the call has completed, sent to the caller's browser so the page can
+ * show what the receptionist has done so far. Sent by the tools, after the
+ * database confirmed the step, never on the model's word alone.
+ */
+export interface ProgressEvent {
+  step: 'availability_checked' | 'phone_verified' | 'booked' | 'rescheduled' | 'cancelled' | 'callback';
+  appointment?: {
+    reference: string;
+    doctorBn: string;
+    doctorEn: string;
+    slotStart: string;
+    patientName: string;
+  };
+}
+
+function appointmentDetails(appointment: Appointment): NonNullable<ProgressEvent['appointment']> {
+  const doctor = doctorById(appointment.doctor);
+  return {
+    reference: appointment.reference,
+    doctorBn: doctor?.nameBn ?? appointment.doctor,
+    doctorEn: doctor?.nameEn ?? appointment.doctor,
+    slotStart: appointment.slotStart.toISOString(),
+    patientName: appointment.patientName,
+  };
+}
+
 export const LLM_MODEL = process.env.LLM_MODEL ?? 'google/gemini-3.8-flash';
 
 const PART_OF_DAY: Record<string, [number, number]> = {
@@ -62,7 +89,7 @@ async function safely(run: () => Promise<string>): Promise<string> {
 }
 
 /** Bangla receptionist for a dental clinic. */
-export function createAgent(state: CallState) {
+export function createAgent(state: CallState, report: (event: ProgressEvent) => void = () => {}) {
   const doctorLines = DOCTORS.map((d) => `- ${d.nameBn} (doctor id: ${d.id}): ${d.focusBn}`).join('\n');
   const feeLines = SERVICES.map((s) => `- ${s.nameBn}: ${s.feeBn}`).join('\n');
 
@@ -117,10 +144,14 @@ export function createAgent(state: CallState) {
         1. Find out the reason for the visit in a few words.
         2. Ask which day and roughly what time suits them.
         3. Check availability before offering any time. Offer at most three times.
-        4. Ask the caller's full name, then say it back to confirm.
+        4. Ask the caller's full name. Say it back exactly as you heard it and ask only whether it is right. Stop there and wait for their answer.
         5. Ask their mobile number, then read it back digit by digit and wait for them to confirm.
         6. Repeat the doctor, day and time, and wait for a clear yes.
-        7. Only then book. Afterwards confirm in one sentence.
+        7. Only then book. Afterwards confirm in one sentence, and ask if they need anything else.
+
+        Names: what you receive is a speech recogniser's guess, and names are where it is most often wrong. Never replace the name you heard with a more common or more correct-looking name. If the caller says the name is wrong, ask them to say it once more slowly, and say it back again. If it is still wrong after two tries, keep their latest version and tell them the front desk will check the spelling when they come.
+
+        A confirmation question always stands alone. Never ask for the next detail in the same turn as "is that right?".
 
         Changing or cancelling:
         1. Ask for the mobile number the booking was made with, and read it back.
@@ -172,6 +203,7 @@ export function createAgent(state: CallState) {
             if (!isValidDate(date)) return 'That is not a valid date. Ask the caller which day they mean.';
             state.startedBooking = true;
             await saveExtraction(state.callId, { preferredDate: date, doctor: doctor ?? undefined });
+            report({ step: 'availability_checked' });
 
             const slots = await getFreeSlots(date, doctor ?? undefined);
             const [from, to] = PART_OF_DAY[partOfDay] ?? PART_OF_DAY.any!;
@@ -228,6 +260,7 @@ export function createAgent(state: CallState) {
             if (!phoneCheck.ok) {
               return `The phone number is not valid: ${phoneCheck.reason}. Nothing was booked. Ask for the mobile number again and read it back.`;
             }
+            report({ step: 'phone_verified' });
             const slot = checkSlot(date, time);
             if (!slot.ok) return `Cannot book: ${slot.reason}. Nothing was booked. Check availability and offer another time.`;
 
@@ -243,6 +276,7 @@ export function createAgent(state: CallState) {
               return 'That time was just taken by someone else. Nothing was booked. Check availability again and offer another time.';
             }
             state.booked = true;
+            report({ step: 'booked', appointment: appointmentDetails(result.appointment) });
             await saveExtraction(state.callId, { preferredTime: time });
             return `Booked. ${describe(result.appointment)}. Patient: ${result.appointment.patientName}, phone ${phoneForSpeech(result.appointment.phone)}. Confirm to the caller in one sentence.`;
           });
@@ -265,6 +299,7 @@ export function createAgent(state: CallState) {
             });
             if (!phoneCheck.ok) return `The phone number is not valid: ${phoneCheck.reason}. Ask for it again and read it back.`;
 
+            report({ step: 'phone_verified' });
             const appointments = await findUpcomingAppointments(phoneCheck.phone);
             if (appointments.length === 0) {
               return `No upcoming appointment under ${phoneForSpeech(phoneCheck.phone)}. Check the number with the caller, or offer to make a new booking.`;
@@ -301,6 +336,7 @@ export function createAgent(state: CallState) {
             if (result.status === 'not_found') return 'That appointment was not found or is already cancelled. Nothing was changed. Look it up again.';
             if (result.status === 'slot_taken') return 'That time is already taken. Nothing was changed. Check availability and offer another time.';
             state.rescheduled = true;
+            report({ step: 'rescheduled', appointment: appointmentDetails(result.appointment) });
             await saveExtraction(state.callId, { preferredTime: time, patientName: result.appointment.patientName });
             return `Moved. New time: ${describe(result.appointment)}. Confirm the new time to the caller in one sentence.`;
           });
@@ -321,6 +357,7 @@ export function createAgent(state: CallState) {
             const result = await cancelAppointment({ callId: state.callId, appointmentId });
             if (result.status === 'not_found') return 'That appointment was not found or is already cancelled. Nothing was changed.';
             state.cancelled = true;
+            report({ step: 'cancelled', appointment: appointmentDetails(result.appointment) });
             await saveExtraction(state.callId, { patientName: result.appointment.patientName });
             return `Cancelled: ${describe(result.appointment)}. Tell the caller it is cancelled, and offer to book another time if they wish.`;
           });
@@ -358,6 +395,7 @@ export function createAgent(state: CallState) {
               phone: phoneCheck?.ok ? phoneCheck.phone : undefined,
             });
             state.callbackRequested = true;
+            report({ step: 'callback' });
             return phoneCheck?.ok
               ? 'Callback recorded. Tell the caller someone from the front desk will call them during opening hours.'
               : 'Callback recorded without a phone number. Ask for a mobile number so the front desk can call back, then record it again.';
