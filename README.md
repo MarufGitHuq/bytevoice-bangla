@@ -16,7 +16,7 @@ browser. There is no phone line.
 | Landing page (live call) | https://bytevoice-bangla-pied.vercel.app |
 | Staff portal | https://bytevoice-bangla-pied.vercel.app/portal |
 | Portal login | Sent in the submission email (not kept in a public repo) |
-| Video walkthrough | `<VIDEO_URL>` |
+| Video walkthrough | `https://www.loom.com/share/341a34fd7dde4e43885bed92052ea1cc` |
 | Code | https://github.com/MarufGitHuq/bytevoice-bangla |
 
 ## What to try
