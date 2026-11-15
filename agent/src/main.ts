@@ -21,6 +21,17 @@ const STT_LANGUAGE = process.env.STT_LANGUAGE ?? 'bn';
 const TTS_MODEL = process.env.TTS_MODEL ?? 'google/gemini-3.8-flash-tts';
 const TTS_VOICE = process.env.TTS_VOICE ?? 'Leda';
 
+// How long the caller may be silent before their turn is taken as finished.
+// People say a phone number in groups with pauses between them, so while the
+// receptionist is waiting for a number the wait is longer.
+const NORMAL_WAIT = { minDelay: 900, maxDelay: 3000 };
+const NUMBER_WAIT = { minDelay: 2200, maxDelay: 5000 };
+
+/** True when the receptionist has just asked for a phone number (not when she reads one back). */
+function asksForNumber(text: string) {
+  return /নম্বর|নাম্বার/.test(text) && !/ঠিক/.test(text);
+}
+
 const GREETING = `আসসালামু আলাইকুম, ${CLINIC.nameBn} থেকে ${CLINIC.agentNameBn} বলছি। বলুন, আপনাকে কীভাবে সাহায্য করতে পারি?`;
 
 /** Removes speech markup (emotion and pacing tags) so the stored transcript is plain text. */
@@ -51,7 +62,7 @@ export default defineAgent({
         // Wait a little longer before deciding the caller has finished. With the
         // default (500 ms) a pause in the middle of a sentence was taken as the
         // end of a turn, so one request became two turns and got two answers.
-        endpointing: { minDelay: 900 },
+        endpointing: NORMAL_WAIT,
         // Start thinking before the caller has fully stopped, to cut the pause.
         preemptiveGeneration: { enabled: true },
       },
@@ -71,6 +82,15 @@ export default defineAgent({
       const text = plainText(item.textContent ?? '');
       if (!text) return;
       const speaker = item.role === 'user' ? 'caller' : 'agent';
+      if (speaker === 'agent') {
+        try {
+          session.updateOptions({
+            turnHandling: { endpointing: asksForNumber(text) ? NUMBER_WAIT : NORMAL_WAIT },
+          });
+        } catch (error) {
+          console.error('could not change the end-of-turn wait', error);
+        }
+      }
       if (speaker === 'caller') callerTurns += 1;
       const turn = (seq += 1);
       turns.push({ speaker, text });

@@ -209,7 +209,18 @@ export function useCall() {
           m.type === 'agentTranscript' || (m.type !== 'userTranscript' && !m.from?.isLocal),
         text: m.message,
       }));
-    setTranscript((kept) => (lines.length >= kept.length ? lines : kept));
+    // Speech arrives in pieces; pieces the caller said one after another are
+    // shown as one line.
+    const merged: TranscriptLine[] = [];
+    for (const line of lines) {
+      const last = merged[merged.length - 1];
+      if (last && !last.fromAgent && !line.fromAgent) {
+        merged[merged.length - 1] = { ...last, text: `${last.text} ${line.text}` };
+      } else {
+        merged.push(line);
+      }
+    }
+    setTranscript((kept) => (merged.length >= kept.length ? merged : kept));
   }, [messages]);
 
   // Steps the agent reports as done. Each step is listed once; a newer report
