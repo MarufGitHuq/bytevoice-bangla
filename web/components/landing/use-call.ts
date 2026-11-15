@@ -198,18 +198,18 @@ export function useCall() {
   useEffect(() => () => void end().catch(() => {}), [end]);
 
   // Spoken turns from both sides, plus anything the caller typed.
+  // When the call ends the library drops the spoken lines and keeps only the
+  // typed ones, so the list is copied here and never replaced by a shorter one.
   useEffect(() => {
-    if (messages.length === 0) return;
-    setTranscript(
-      messages
-        .filter((m) => m.message.trim())
-        .map((m) => ({
-          id: m.id,
-          fromAgent:
-            m.type === 'agentTranscript' || (m.type !== 'userTranscript' && !m.from?.isLocal),
-          text: m.message,
-        }))
-    );
+    const lines = messages
+      .filter((m) => m.message.trim())
+      .map((m) => ({
+        id: m.id,
+        fromAgent:
+          m.type === 'agentTranscript' || (m.type !== 'userTranscript' && !m.from?.isLocal),
+        text: m.message,
+      }));
+    setTranscript((kept) => (lines.length >= kept.length ? lines : kept));
   }, [messages]);
 
   // Steps the agent reports as done. Each step is listed once; a newer report

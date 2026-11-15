@@ -337,7 +337,10 @@ export function createAgent(state: CallState, report: (event: ProgressEvent) => 
             if (appointments.length === 0) {
               return `No upcoming appointment under ${phoneForSpeech(phoneCheck.phone)}. Check the number with the caller, or offer to make a new booking.`;
             }
-            return `Upcoming appointments for ${appointments[0]!.patientName}: ${appointments.map(describe).join(' ; ')}.`;
+            // Each appointment carries its own name: one phone number can hold
+            // bookings for different people.
+            const list = appointments.map((a) => `${a.patientName}: ${describe(a)}`).join(' ; ');
+            return `Upcoming appointments under this number, each with the name it was booked in: ${list}. Say each name with its own appointment; never give one name for all of them.`;
           }),
       }),
 
