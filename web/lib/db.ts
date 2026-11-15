@@ -16,9 +16,7 @@ function db(): pg.Pool {
     pool = new pg.Pool({
       connectionString,
       max: 3,
-      ssl: isLocal
-        ? undefined
-        : { rejectUnauthorized: true, ca: caCertificate() },
+      ssl: isLocal ? undefined : { rejectUnauthorized: true, ca: caCertificate() },
     });
   }
   return pool;
