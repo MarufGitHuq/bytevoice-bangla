@@ -48,6 +48,10 @@ export default defineAgent({
       turnHandling: {
         // Decides when the caller has finished speaking, from the audio itself.
         turnDetection: new inference.TurnDetector(),
+        // Wait a little longer before deciding the caller has finished. With the
+        // default (500 ms) a pause in the middle of a sentence was taken as the
+        // end of a turn, so one request became two turns and got two answers.
+        endpointing: { minDelay: 900 },
         // Start thinking before the caller has fully stopped, to cut the pause.
         preemptiveGeneration: { enabled: true },
       },
