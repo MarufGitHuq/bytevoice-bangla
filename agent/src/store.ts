@@ -28,7 +28,7 @@ function db(): pg.Pool {
       // over TLS with the server certificate verified. If the host's certificate
       // is signed by its own CA (Supabase publishes one), pass that CA in
       // DATABASE_CA_CERT rather than turning verification off.
-      ssl: isLocal ? undefined : { rejectUnauthorized: true, ca: process.env.DATABASE_CA_CERT || undefined },
+      ssl: isLocal ? undefined : { rejectUnauthorized: true, ca: caCertificate() },
     });
   }
   return pool;
@@ -414,4 +414,12 @@ export async function createCallback(input: {
     input.phone ?? null,
     input.reason,
   ]);
+}
+
+/**
+ * The database host's CA certificate, if one was given. Some hosts only accept
+ * single-line settings, so line breaks may arrive as a backslash followed by n.
+ */
+function caCertificate(): string | undefined {
+  return process.env.DATABASE_CA_CERT?.replace(/\\n/g, '\n') || undefined;
 }

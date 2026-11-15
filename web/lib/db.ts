@@ -18,7 +18,7 @@ function db(): pg.Pool {
       max: 3,
       ssl: isLocal
         ? undefined
-        : { rejectUnauthorized: true, ca: process.env.DATABASE_CA_CERT || undefined },
+        : { rejectUnauthorized: true, ca: caCertificate() },
     });
   }
   return pool;
@@ -278,4 +278,12 @@ export async function listOpenCallbacks(): Promise<OpenCallback[]> {
        from callbacks where status = 'open' order by created_at desc limit 50`
   );
   return rows;
+}
+
+/**
+ * The database host's CA certificate, if one was given. Some hosts only accept
+ * single-line settings, so line breaks may arrive as a backslash followed by n.
+ */
+function caCertificate(): string | undefined {
+  return process.env.DATABASE_CA_CERT?.replace(/\\n/g, '\n') || undefined;
 }
