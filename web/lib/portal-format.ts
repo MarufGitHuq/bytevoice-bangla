@@ -113,12 +113,12 @@ export const INTENT_LABELS: Record<string, string> = {
 };
 
 /**
- * A calendar file (.ics) for one appointment, as a link the browser can
- * download. Staff open it to put the visit in the doctor's calendar (Google,
- * Outlook and Apple calendars all read this format). It is built from data
- * already on the page, so no email or SMS service is involved.
+ * A ready-written email about one appointment, as a mailto: link. Staff press
+ * "Notify the doctor manually", their own mail app opens with the details
+ * filled in, and they choose the doctor's address and send it. Nothing is sent
+ * by this app, so no email or SMS service is involved.
  */
-export function appointmentCalendarLink(a: {
+export function notifyDoctorLink(a: {
   reference: string;
   doctor: string;
   reason: string | null;
@@ -126,36 +126,19 @@ export function appointmentCalendarLink(a: {
   patientName: string;
   patientPhone: string;
 }): string {
-  // Calendar files give times in UTC as 20261115T100000Z.
-  const stamp = (d: Date) =>
-    d
-      .toISOString()
-      .replace(/[-:]/g, '')
-      .replace(/\.\d{3}/, '');
-  // Backslashes, commas and semicolons have a meaning in the format, and a
-  // line break would start a new field. Names and reasons come from callers,
-  // so they are escaped and control characters are removed.
-  const text = (value: string) =>
-    value
-      .replace(/[\u0000-\u001f\u007f]+/g, ' ')
-      .replace(/\\/g, '\\\\')
-      .replace(/[;,]/g, (mark) => `\\${mark}`);
-  const start = new Date(a.slotStart);
-  const end = new Date(start.getTime() + 45 * 60_000);
-  const ics = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//Dhaka Dental Care//Staff portal//EN',
-    'BEGIN:VEVENT',
-    `UID:${a.reference}@dhaka-dental-care.demo`,
-    `DTSTAMP:${stamp(new Date())}`,
-    `DTSTART:${stamp(start)}`,
-    `DTEND:${stamp(end)}`,
-    `SUMMARY:${text(`${a.patientName} (${a.reason ?? 'visit'})`)}`,
-    `DESCRIPTION:${text(`Patient: ${a.patientName}, ${a.patientPhone}. Doctor: ${doctorName(a.doctor)}. Booking reference ${a.reference}. Booked by phone through ByteVoice.`)}`,
-    'LOCATION:Dhaka Dental Care',
-    'END:VEVENT',
-    'END:VCALENDAR',
+  const subject = `New appointment: ${a.patientName}, ${formatSlot(a.slotStart)}`;
+  const body = [
+    `${doctorName(a.doctor)},`,
+    '',
+    'A new appointment was booked by phone:',
+    '',
+    `Patient: ${a.patientName}`,
+    `Phone: ${a.patientPhone}`,
+    `Time: ${formatSlot(a.slotStart)} (Dhaka time)`,
+    `Reason: ${a.reason ?? 'not given'}`,
+    `Booking reference: ${a.reference}`,
+    '',
+    'Dhaka Dental Care front desk',
   ].join('\r\n');
-  return `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
+  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }

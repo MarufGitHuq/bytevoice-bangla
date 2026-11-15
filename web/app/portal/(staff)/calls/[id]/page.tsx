@@ -6,7 +6,6 @@ import { StatusBadge } from '@/components/portal/status-badge';
 import { type AppointmentEvent, getCallPage } from '@/lib/db';
 import {
   INTENT_LABELS,
-  appointmentCalendarLink,
   doctorName,
   formatDateTime,
   formatDuration,
@@ -14,6 +13,7 @@ import {
   formatPlainDate,
   formatPlainTime,
   formatSlot,
+  notifyDoctorLink,
 } from '@/lib/portal-format';
 
 export const dynamic = 'force-dynamic';
@@ -142,11 +142,10 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
                     </dl>
                     {a.status === 'booked' && (
                       <a
-                        href={appointmentCalendarLink(a)}
-                        download={`appointment-${a.reference}.ics`}
-                        className="mt-4 inline-flex items-center gap-2 rounded-md border border-teal-700 px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50"
+                        href={notifyDoctorLink(a)}
+                        className="mt-4 inline-flex items-center gap-2 rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white hover:bg-teal-800"
                       >
-                        Add to doctor&apos;s calendar (.ics)
+                        Notify the doctor manually
                       </a>
                     )}
                     <h3 className="mt-4 text-xs font-medium tracking-wide text-slate-500 uppercase">

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Download, Loader2, Phone, PhoneOff, RotateCcw } from 'lucide-react';
 import { RoomAudioRenderer, SessionProvider } from '@livekit/components-react';
 import { buildCallRecord, downloadCallRecord } from '@/lib/call-record';
-import { CallPanel } from './call-panel';
+import { CallTranscript, CallUpdates } from './call-panel';
 import { HeroOrb } from './hero-orb';
 import { useLanguage } from './language';
 import { useCall } from './use-call';
@@ -23,9 +23,10 @@ export function Hero() {
   const { lang, t } = useLanguage();
   const call = useCall();
 
-  // During a call, and afterwards while there is something to read, the orb
-  // moves behind a panel that shows the steps done and the transcript.
-  const showPanel =
+  // "inCall" changes the layout: the heading shrinks and the transcript opens
+  // under it (left); completed steps appear over the orb (right). It stays on
+  // after the call while there is something to read or download.
+  const inCall =
     call.phase === 'connecting' ||
     call.phase === 'live' ||
     (call.phase === 'ended' && (call.transcript.length > 0 || call.steps.length > 0));
@@ -46,21 +47,29 @@ export function Hero() {
       {/* Plays the receptionist's voice. */}
       <RoomAudioRenderer />
 
-      <div className="mx-auto grid max-w-6xl items-center gap-6 px-4 pt-4 pb-16 sm:px-6 md:grid-cols-[1fr_1.15fr] md:gap-10 md:pt-12 md:pb-24">
-        <div className="order-2 flex flex-col md:order-1">
-          {/* On a phone the call controls move above the heading during a call,
-              so "End call" stays next to the transcript. */}
-          <div className={showPanel ? 'order-2 mt-8 md:order-1 md:mt-0' : ''}>
-            <p className="text-sm font-medium tracking-wide text-teal-300">{t.hero.eyebrow}</p>
-            <h1 className="mt-3 text-2xl leading-tight font-semibold tracking-tight text-balance sm:text-3xl lg:text-4xl">
-              {t.hero.title}
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-300 sm:text-base">
-              {t.hero.subtitle}
+      <div className="mx-auto grid max-w-6xl items-center gap-6 px-4 pt-4 pb-16 sm:px-6 md:grid-cols-[1.1fr_1fr] md:gap-10 md:pt-12 md:pb-24">
+        <div className="order-2 md:order-1">
+          <p className="text-sm font-medium tracking-wide text-teal-300">{t.hero.eyebrow}</p>
+          <h1
+            className={`mt-3 leading-tight font-semibold tracking-tight text-balance transition-[font-size] duration-500 ease-out motion-reduce:transition-none ${
+              inCall ? 'text-xl sm:text-2xl' : 'text-3xl sm:text-4xl lg:text-5xl'
+            }`}
+          >
+            {t.hero.title}
+          </h1>
+          {/* The subtitle folds away during a call to give the transcript room. */}
+          <div
+            className={`grid transition-[grid-template-rows,opacity] duration-500 ease-out motion-reduce:transition-none ${
+              inCall ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'
+            }`}
+            aria-hidden={inCall}
+          >
+            <p className="max-w-xl overflow-hidden text-base leading-relaxed text-slate-300 sm:text-lg">
+              <span className="block pt-4">{t.hero.subtitle}</span>
             </p>
           </div>
 
-          <div className={showPanel ? 'order-1 md:order-2 md:mt-8' : 'mt-8'} aria-live="polite">
+          <div className={inCall ? 'mt-4' : 'mt-8'} aria-live="polite">
             {call.phase === 'idle' && (
               <>
                 <button type="button" onClick={call.startCall} className={primaryButton}>
@@ -109,29 +118,18 @@ export function Hero() {
             )}
 
             {call.phase === 'ended' && (
-              <div className="max-w-xl rounded-2xl border border-white/10 bg-white/5 p-5">
+              <div className="max-w-xl">
                 <p className="font-semibold">{t.call.endedTitle}</p>
-                <p className="mt-1 text-slate-300">{t.call.endedBody}</p>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
+                <p className="mt-1 text-sm text-slate-300">{t.call.endedBody}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
                   <button type="button" onClick={call.startCall} className={primaryButton}>
                     <Phone className="size-5" aria-hidden="true" />
                     {t.call.again}
                   </button>
-                  <button
-                    type="button"
-                    onClick={download}
-                    className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/30 px-5 font-medium hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
-                  >
-                    <Download className="size-5" aria-hidden="true" />
-                    {t.call.download}
-                  </button>
+                  <Link href="/portal" className="text-teal-300 underline-offset-4 hover:underline">
+                    {t.call.openPortal} →
+                  </Link>
                 </div>
-                <Link
-                  href="/portal"
-                  className="mt-4 inline-block text-teal-300 underline-offset-4 hover:underline"
-                >
-                  {t.call.openPortal} →
-                </Link>
               </div>
             )}
 
@@ -152,31 +150,53 @@ export function Hero() {
               </div>
             )}
           </div>
+
+          {inCall && (
+            <div className="mt-4 max-w-xl motion-safe:animate-[fade-in_0.5s_ease-out]">
+              <CallTranscript
+                transcript={call.transcript}
+                live={call.phase === 'live'}
+                isSending={call.isSending}
+                onSend={call.sendText}
+              />
+            </div>
+          )}
         </div>
 
-        <div
-          className={`relative order-1 mx-auto w-full md:order-2 ${
-            showPanel
-              ? 'h-[28rem] md:h-[34rem]'
-              : 'aspect-square max-w-[260px] sm:max-w-[340px] md:max-w-[440px]'
-          }`}
-        >
-          {/* The orb stays mounted; behind the panel it is dimmed. */}
+        {/* Right: the orb, with the steps done so far over it, and the download
+            once the call has ended. */}
+        <div className="order-1 md:order-2">
           <div
-            className={`absolute inset-0 grid place-items-center transition-opacity duration-500 ${showPanel ? 'opacity-50' : ''}`}
+            className={`relative mx-auto aspect-square w-full transition-[max-width] duration-500 md:max-w-[460px] ${
+              inCall ? 'max-w-[220px] sm:max-w-[300px]' : 'max-w-[260px] sm:max-w-[340px]'
+            }`}
           >
-            <div className="aspect-square h-full max-w-full">
+            <div
+              className={`size-full transition-opacity duration-500 ${call.steps.length > 0 ? 'opacity-60' : ''}`}
+            >
               <HeroOrb look={call.look} level={call.level} />
             </div>
+            {/* Wide screens: the steps sit over the orb. */}
+            <div className="absolute inset-x-4 top-4 hidden md:block">
+              <CallUpdates steps={call.steps} />
+            </div>
           </div>
-          {showPanel && (
-            <CallPanel
-              steps={call.steps}
-              transcript={call.transcript}
-              live={call.phase === 'live'}
-              isSending={call.isSending}
-              onSend={call.sendText}
-            />
+          {/* Phones: the orb is small, so the steps go under it. */}
+          <div className="mt-3 md:hidden">
+            <CallUpdates steps={call.steps} />
+          </div>
+
+          {call.phase === 'ended' && inCall && (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={download}
+                className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/30 px-5 font-medium hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none"
+              >
+                <Download className="size-5" aria-hidden="true" />
+                {t.call.download}
+              </button>
+            </div>
           )}
         </div>
       </div>

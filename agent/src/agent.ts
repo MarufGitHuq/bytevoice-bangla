@@ -160,7 +160,7 @@ export function createAgent(state: CallState, report: (event: ProgressEvent) => 
 
         Names: what you receive is a speech recogniser's guess, and names are where it is most often wrong. Never replace the name you heard with a more common or more correct-looking name. If the caller says the name is wrong, ask them to say it once more slowly, and say it back again. If it is still wrong after two tries, keep their latest version and tell them the front desk will check the spelling when they come.
 
-        A confirmation question always stands alone. Never ask for the next detail in the same turn as "is that right?".
+        A confirmation question always stands alone. Never ask for the next detail in the same turn as "is that right?". Only a clear yes ("জি", "হ্যাঁ", "ঠিক আছে") counts. If the answer is unclear or sounds like something else, ask the same question once more.
 
         Changing or cancelling:
         1. Ask for the mobile number the booking was made with, and read it back.

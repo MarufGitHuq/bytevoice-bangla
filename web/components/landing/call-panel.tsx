@@ -6,26 +6,23 @@ import { describeAppointment } from '@/lib/call-record';
 import { useLanguage } from './language';
 import type { CallStep, TranscriptLine } from './use-call';
 
-// What the caller sees over the orb during a call, top to bottom:
-//   1. the steps the receptionist has completed (reported by the agent's tools),
-//   2. the transcript, as it is spoken or typed,
-//   3. a text box, for callers who would rather type or were misheard.
+// The two parts of the page that fill in during a call:
+//   CallTranscript: what is said or typed, with a text box (left, under the heading).
+//   CallUpdates:    the steps the receptionist has completed (right, over the orb).
 
-export function CallPanel({
-  steps,
+export function CallTranscript({
   transcript,
   live,
   isSending,
   onSend,
 }: {
-  steps: CallStep[];
   transcript: TranscriptLine[];
   /** The text box is shown only while the call is live. */
   live: boolean;
   isSending: boolean;
   onSend: (text: string) => Promise<void>;
 }) {
-  const { lang, t } = useLanguage();
+  const { t } = useLanguage();
   const [draft, setDraft] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -43,50 +40,17 @@ export function CallPanel({
     void onSend(text);
   };
 
-  // The appointment shown is the one from the latest step that has one.
-  const appointment = [...steps].reverse().find((s) => s.appointment)?.appointment;
-
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/55 backdrop-blur-[2px]">
-      {steps.length > 0 && (
-        <section
-          aria-label={t.call.progress}
-          aria-live="polite"
-          className="border-b border-white/10 p-3 sm:p-4"
-        >
-          <ul className="flex flex-wrap gap-2">
-            {steps.map((s) => (
-              <li
-                key={s.step}
-                className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/40 bg-teal-400/15 px-3 py-1 text-xs font-medium text-teal-100"
-              >
-                <Check className="size-3.5" aria-hidden="true" />
-                {t.call.steps[s.step]}
-              </li>
-            ))}
-          </ul>
-          {appointment && (
-            <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3 text-sm">
-              <p className="font-medium text-slate-50">{describeAppointment(appointment, lang)}</p>
-              <p className="mt-1 text-slate-300">
-                {appointment.patientName}
-                {appointment.reference && (
-                  <>
-                    <span className="mx-2 text-slate-500">·</span>
-                    {t.call.reference}: <span className="font-mono">{appointment.reference}</span>
-                  </>
-                )}
-              </p>
-            </div>
-          )}
-        </section>
-      )}
-
+    <section
+      aria-label={t.call.transcript}
+      className="flex h-80 flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] md:h-[22rem]"
+    >
+      {/* Scrolls with wheel, touch or keyboard; the scrollbar itself is hidden. */}
       <div
         ref={scroller}
         role="log"
-        aria-label={t.call.transcript}
-        className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4"
+        tabIndex={0}
+        className="min-h-0 flex-1 [scrollbar-width:none] overflow-y-auto p-3 focus-visible:outline-none sm:p-4 [&::-webkit-scrollbar]:hidden"
       >
         <h2 className="text-xs font-medium tracking-wider text-slate-400 uppercase">
           {t.call.transcript}
@@ -140,6 +104,44 @@ export function CallPanel({
           </button>
         </form>
       )}
-    </div>
+    </section>
+  );
+}
+
+export function CallUpdates({ steps }: { steps: CallStep[] }) {
+  const { lang, t } = useLanguage();
+  if (steps.length === 0) return null;
+
+  // The appointment shown is the one from the latest step that has one.
+  const appointment = [...steps].reverse().find((s) => s.appointment)?.appointment;
+
+  return (
+    <section aria-label={t.call.progress} aria-live="polite" className="space-y-2">
+      <ul className="space-y-2">
+        {steps.map((s) => (
+          <li
+            key={s.step}
+            className="flex w-fit items-center gap-2 rounded-full border border-teal-400/40 bg-slate-950/70 px-3 py-1.5 text-sm font-medium text-teal-100 backdrop-blur-sm motion-safe:animate-[fade-in_0.4s_ease-out]"
+          >
+            <Check className="size-4 text-teal-300" aria-hidden="true" />
+            {t.call.steps[s.step]}
+          </li>
+        ))}
+      </ul>
+      {appointment && (
+        <div className="rounded-2xl border border-white/15 bg-slate-950/75 p-4 text-sm backdrop-blur-sm">
+          <p className="font-medium text-slate-50">{describeAppointment(appointment, lang)}</p>
+          <p className="mt-1 text-slate-300">
+            {appointment.patientName}
+            {appointment.reference && (
+              <>
+                <span className="mx-2 text-slate-500">·</span>
+                {t.call.reference}: <span className="font-mono">{appointment.reference}</span>
+              </>
+            )}
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
