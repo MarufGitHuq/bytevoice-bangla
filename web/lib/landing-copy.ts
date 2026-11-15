@@ -38,7 +38,7 @@ const en = {
     you: 'You',
     agent: 'Mitu',
     typeLabel: 'Type a message to Mitu',
-    typePlaceholder: 'Or type here…',
+    typePlaceholder: 'Type your name or phone number here…',
     send: 'Send',
     progress: 'Done so far',
     steps: {
@@ -149,7 +149,7 @@ const bn: Copy = {
     you: 'আপনি',
     agent: 'মিতু',
     typeLabel: 'মিতুকে লিখে জানান',
-    typePlaceholder: 'চাইলে লিখেও বলতে পারেন…',
+    typePlaceholder: 'নাম বা ফোন নম্বর লিখেও দিতে পারেন…',
     send: 'পাঠান',
     progress: 'এ পর্যন্ত যা হয়েছে',
     steps: {

@@ -67,7 +67,9 @@ export async function listCalls(filter: {
             c.started_at as "startedAt",
             c.duration_s as "durationS",
             c.status,
-            coalesce(p.full_name, x.patient_name) as "callerName",
+            -- The name said on this call comes first: a phone number can be
+            -- shared, so the patient row may carry someone else's name.
+            coalesce(x.patient_name, p.full_name) as "callerName",
             coalesce(p.phone, x.phone)            as "callerPhone",
             c.summary_en as "summaryEn"
        from calls c
@@ -75,7 +77,7 @@ export async function listCalls(filter: {
        left join call_extractions x on x.call_id = c.id
       where ($1::text is null or c.status = $1)
         and ($2::text is null
-             or coalesce(p.full_name, x.patient_name, '') ilike '%' || $2 || '%'
+             or coalesce(x.patient_name, p.full_name, '') ilike '%' || $2 || '%'
              or coalesce(p.phone, x.phone, '')            like  '%' || $2 || '%')
       order by c.started_at desc
       limit 200`,
@@ -226,7 +228,7 @@ export async function getCallPage(id: string): Promise<CallPage | null> {
     // Appointments this call created, plus any it rescheduled or cancelled.
     db().query<Omit<LinkedAppointment, 'events'>>(
       `select a.id, a.reference, a.doctor, a.reason, a.slot_start as "slotStart", a.status,
-              p.full_name as "patientName", p.phone as "patientPhone",
+              coalesce(a.patient_name, p.full_name) as "patientName", p.phone as "patientPhone",
               (a.call_id = $1) as "createdByThisCall"
          from appointments a join patients p on p.id = a.patient_id
         where a.call_id = $1

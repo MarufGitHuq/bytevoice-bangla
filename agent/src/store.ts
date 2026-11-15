@@ -163,7 +163,7 @@ export async function endCall(
 async function upsertPatient(client: pg.PoolClient, fullName: string, phone: string): Promise<string> {
   const { rows } = await client.query<{ id: string }>(
     `insert into patients (full_name, phone) values ($1, $2)
-     on conflict (phone) do update set full_name = excluded.full_name, updated_at = now()
+     on conflict (phone) do update set updated_at = now()
      returning id`,
     [fullName.trim(), phone],
   );
@@ -224,7 +224,7 @@ function newReference() {
 }
 
 const APPOINTMENT_COLUMNS = `a.id, a.reference, a.doctor, a.reason, a.slot_start as "slotStart", a.status,
-  p.full_name as "patientName", p.phone`;
+  coalesce(a.patient_name, p.full_name) as "patientName", p.phone`;
 
 export type BookResult =
   | { status: 'booked' | 'already_booked'; appointment: Appointment }
@@ -261,11 +261,11 @@ export async function bookAppointment(input: {
     }
 
     const inserted = await client.query<{ id: string }>(
-      `insert into appointments (reference, patient_id, call_id, doctor, reason, slot_start)
-       values ($1, $2, $3, $4, $5, $6)
+      `insert into appointments (reference, patient_id, call_id, doctor, reason, slot_start, patient_name)
+       values ($1, $2, $3, $4, $5, $6, $7)
        on conflict (doctor, slot_start) where status = 'booked' do nothing
        returning id`,
-      [newReference(), patientId, input.callId, input.doctor, input.reason, input.slotStart],
+      [newReference(), patientId, input.callId, input.doctor, input.reason, input.slotStart, input.fullName],
     );
     if (!inserted.rows[0]) {
       await client.query('rollback');

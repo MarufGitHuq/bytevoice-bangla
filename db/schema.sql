@@ -96,6 +96,11 @@ create table if not exists appointments (
 
 -- The database, not the language model, prevents double booking: one doctor
 -- cannot have two live appointments in the same slot.
+-- The name given on the call that made the booking. Two people can share one
+-- phone number (a family, for example), and patients are keyed by phone, so the
+-- name must be kept with the booking itself, not only on the patient row.
+alter table appointments add column if not exists patient_name text;
+
 create unique index if not exists appointments_one_per_slot
   on appointments (doctor, slot_start) where status = 'booked';
 

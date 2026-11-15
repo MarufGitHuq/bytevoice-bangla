@@ -154,7 +154,7 @@ export function createAgent(state: CallState, report: (event: ProgressEvent) => 
         2. Ask which day and roughly what time suits them.
         3. Check availability before offering any time. Offer at most three times.
         4. Ask the caller's full name. Say it back exactly as you heard it and ask only whether it is right. Stop there and wait for their answer.
-        5. Ask their mobile number, then read it back digit by digit and wait for them to confirm.
+        5. Ask their mobile number, and add that they can also type it in the box on the page if that is easier. Check what you heard with checkPhoneNumber before you read anything back. Then read it back digit by digit and wait for them to confirm.
         6. Repeat the doctor, day and time, and wait for a clear yes.
         7. Only then book. Afterwards confirm in one sentence, and ask if they need anything else.
 
@@ -163,7 +163,7 @@ export function createAgent(state: CallState, report: (event: ProgressEvent) => 
         A confirmation question always stands alone. Never ask for the next detail in the same turn as "is that right?". Only a clear yes ("জি", "হ্যাঁ", "ঠিক আছে") counts. If the answer is unclear or sounds like something else, ask the same question once more.
 
         Changing or cancelling:
-        1. Ask for the mobile number the booking was made with, and read it back.
+        1. Ask for the mobile number the booking was made with (they can also type it in the box on the page). Check it with checkPhoneNumber, then read it back.
         2. Look up their appointments. If there is more than one, ask which.
         3. For a change, find a new time the same way as for a booking. For a cancellation, confirm they want to cancel.
         4. Wait for a clear yes before changing or cancelling.
@@ -236,6 +236,30 @@ export function createAgent(state: CallState, report: (event: ProgressEvent) => 
             return `Free on ${day} (${date}): ${list(wanted)}. Offer at most three, and let the caller choose.`;
           });
         },
+      }),
+
+      tool({
+        name: 'checkPhoneNumber',
+        description: dedent`
+          Check a mobile number the caller has just said or typed, before reading it back to them.
+          Speech recognition often drops or doubles a digit, and this finds that out straight away.
+        `,
+        parameters: z.object({
+          phone: z.string().describe('The number exactly as heard, as digits'),
+        }),
+        execute: async ({ phone }) =>
+          safely(async () => {
+            const phoneCheck = normalisePhone(phone);
+            await saveExtraction(state.callId, {
+              phone: phoneCheck.ok ? phoneCheck.phone : phone,
+              phoneValid: phoneCheck.ok,
+            });
+            if (!phoneCheck.ok) {
+              return `Not a valid mobile number: ${phoneCheck.reason}. Do not read it back. Say you did not catch the whole number, and ask the caller to say it again slowly or to type it in the box on the page.`;
+            }
+            report({ step: 'phone_checked' });
+            return `Valid number. Read it back exactly like this and wait for a clear yes: ${phoneForSpeech(phoneCheck.phone)}`;
+          }),
       }),
 
       tool({

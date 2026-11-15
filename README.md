@@ -97,7 +97,7 @@ the tables in plain words at `/portal/data-model`.
 | `calls` | One row per call; the root everything links to. | `room_name` unique: the LiveKit room is the natural key, so a repeated start does not create a second row. `status` limited to eight outcomes. Stores the STT, LLM and TTS model used, to compare quality and cost later. |
 | `transcript_turns` | The full conversation, in order. | `unique (call_id, seq)`; `speaker` is `agent` or `caller`; `offset_ms` gives timestamps. |
 | `call_extractions` | Structured fields from the conversation (name, phone, reason, date, time, doctor, intent, notes). | One row per call (`call_id` is the primary key), updated as the call goes on. `phone_valid` flags a number that failed validation, for a human to check. |
-| `appointments` | Bookings. | Partial unique index `appointments_one_per_slot on (doctor, slot_start) where status = 'booked'`: the database, not the prompt, stops double booking. A cancelled row frees the slot. `reference` unique. `call_id` records which call made it. |
+| `appointments` | Bookings. | Partial unique index `appointments_one_per_slot on (doctor, slot_start) where status = 'booked'`: the database, not the prompt, stops double booking. A cancelled row frees the slot. `reference` unique. `call_id` records which call made it. `patient_name` keeps the name given on that call, because two people can share one phone number. |
 | `appointment_events` | History of each appointment. | Append-only: `booked`, `rescheduled` (with `from_slot` and `to_slot`) or `cancelled`, each with the call that did it. A reschedule never loses the old time. |
 | `callbacks` | Requests the agent handed to a human. | `status` is `open` or `done`. |
 
