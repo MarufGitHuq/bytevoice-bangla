@@ -331,6 +331,15 @@ proof.
   reads them back and waits for a yes, which catches errors but costs time.
   Next: compare other Bangla STT models on recorded test calls, and add
   keyword hints for doctor names.
+- **A phone number is not proof of identity.** Anyone who knows a patient's
+  mobile number can ask to move or cancel that patient's appointment, as with
+  many real front desks. The page is therefore never sent the booking
+  reference for an appointment found by phone number, only for one booked on
+  the same call. Next: a one-time code by SMS before a change or cancellation.
+- **Doctors are not notified automatically.** The portal offers a calendar
+  file (.ics) for each booked appointment, which staff add to the doctor's
+  calendar. Email or SMS to the doctor needs a paid sending service, which
+  was outside the budget for this task. Next: a calendar integration.
 - **Single clinic.** Clinic facts, doctors and slot hours are constants in
   `clinic.ts`. There are no doctor schedules, leave or holidays beyond Friday.
   Next: move them to tables the portal can edit.

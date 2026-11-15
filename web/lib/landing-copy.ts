@@ -43,7 +43,7 @@ const en = {
     progress: 'Done so far',
     steps: {
       availability_checked: 'Free times checked',
-      phone_verified: 'Phone number verified',
+      phone_checked: 'Phone number checked',
       booked: 'Appointment booked',
       rescheduled: 'Appointment moved',
       cancelled: 'Appointment cancelled',
@@ -154,7 +154,7 @@ const bn: Copy = {
     progress: 'এ পর্যন্ত যা হয়েছে',
     steps: {
       availability_checked: 'খালি সময় দেখা হয়েছে',
-      phone_verified: 'ফোন নম্বর যাচাই হয়েছে',
+      phone_checked: 'ফোন নম্বর মিলিয়ে নেওয়া হয়েছে',
       booked: 'অ্যাপয়েন্টমেন্ট বুক হয়েছে',
       rescheduled: 'অ্যাপয়েন্টমেন্টের সময় বদলেছে',
       cancelled: 'অ্যাপয়েন্টমেন্ট বাতিল হয়েছে',

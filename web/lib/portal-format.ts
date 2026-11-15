@@ -132,8 +132,14 @@ export function appointmentCalendarLink(a: {
       .toISOString()
       .replace(/[-:]/g, '')
       .replace(/\.\d{3}/, '');
-  // Commas, semicolons and line breaks have a meaning in the format.
-  const text = (value: string) => value.replace(/([\;,])/g, '\$1').replace(/\r?\n/g, ' ');
+  // Backslashes, commas and semicolons have a meaning in the format, and a
+  // line break would start a new field. Names and reasons come from callers,
+  // so they are escaped and control characters are removed.
+  const text = (value: string) =>
+    value
+      .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+      .replace(/\\/g, '\\\\')
+      .replace(/[;,]/g, (mark) => `\\${mark}`);
   const start = new Date(a.slotStart);
   const end = new Date(start.getTime() + 45 * 60_000);
   const ics = [

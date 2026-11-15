@@ -40,9 +40,12 @@ export interface CallState {
  * database confirmed the step, never on the model's word alone.
  */
 export interface ProgressEvent {
-  step: 'availability_checked' | 'phone_verified' | 'booked' | 'rescheduled' | 'cancelled' | 'callback';
+  // 'phone_checked' means the number has a valid Bangladeshi mobile format,
+  // not that the caller was proven to own it.
+  step: 'availability_checked' | 'phone_checked' | 'booked' | 'rescheduled' | 'cancelled' | 'callback';
   appointment?: {
-    reference: string;
+    /** Only for a booking made on this call (see appointmentDetails). */
+    reference?: string;
     doctorBn: string;
     doctorEn: string;
     slotStart: string;
@@ -50,10 +53,16 @@ export interface ProgressEvent {
   };
 }
 
-function appointmentDetails(appointment: Appointment): NonNullable<ProgressEvent['appointment']> {
+// The booking reference goes to the browser only for a booking made on this
+// call. An appointment found by phone number alone is not proof the caller
+// owns it, so for a change or a cancellation the page gets no reference.
+function appointmentDetails(
+  appointment: Appointment,
+  madeOnThisCall = false,
+): NonNullable<ProgressEvent['appointment']> {
   const doctor = doctorById(appointment.doctor);
   return {
-    reference: appointment.reference,
+    ...(madeOnThisCall ? { reference: appointment.reference } : {}),
     doctorBn: doctor?.nameBn ?? appointment.doctor,
     doctorEn: doctor?.nameEn ?? appointment.doctor,
     slotStart: appointment.slotStart.toISOString(),
@@ -260,7 +269,7 @@ export function createAgent(state: CallState, report: (event: ProgressEvent) => 
             if (!phoneCheck.ok) {
               return `The phone number is not valid: ${phoneCheck.reason}. Nothing was booked. Ask for the mobile number again and read it back.`;
             }
-            report({ step: 'phone_verified' });
+            report({ step: 'phone_checked' });
             const slot = checkSlot(date, time);
             if (!slot.ok) return `Cannot book: ${slot.reason}. Nothing was booked. Check availability and offer another time.`;
 
@@ -276,7 +285,7 @@ export function createAgent(state: CallState, report: (event: ProgressEvent) => 
               return 'That time was just taken by someone else. Nothing was booked. Check availability again and offer another time.';
             }
             state.booked = true;
-            report({ step: 'booked', appointment: appointmentDetails(result.appointment) });
+            report({ step: 'booked', appointment: appointmentDetails(result.appointment, true) });
             await saveExtraction(state.callId, { preferredTime: time });
             return `Booked. ${describe(result.appointment)}. Patient: ${result.appointment.patientName}, phone ${phoneForSpeech(result.appointment.phone)}. Confirm to the caller in one sentence.`;
           });
@@ -299,7 +308,7 @@ export function createAgent(state: CallState, report: (event: ProgressEvent) => 
             });
             if (!phoneCheck.ok) return `The phone number is not valid: ${phoneCheck.reason}. Ask for it again and read it back.`;
 
-            report({ step: 'phone_verified' });
+            report({ step: 'phone_checked' });
             const appointments = await findUpcomingAppointments(phoneCheck.phone);
             if (appointments.length === 0) {
               return `No upcoming appointment under ${phoneForSpeech(phoneCheck.phone)}. Check the number with the caller, or offer to make a new booking.`;

@@ -70,8 +70,12 @@ export function CallPanel({
               <p className="font-medium text-slate-50">{describeAppointment(appointment, lang)}</p>
               <p className="mt-1 text-slate-300">
                 {appointment.patientName}
-                <span className="mx-2 text-slate-500">·</span>
-                {t.call.reference}: <span className="font-mono">{appointment.reference}</span>
+                {appointment.reference && (
+                  <>
+                    <span className="mx-2 text-slate-500">·</span>
+                    {t.call.reference}: <span className="font-mono">{appointment.reference}</span>
+                  </>
+                )}
               </p>
             </div>
           )}

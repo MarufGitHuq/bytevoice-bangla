@@ -49,7 +49,9 @@ export function buildCallRecord(input: {
     if (step.appointment) {
       lines.push(`    ${describeAppointment(step.appointment, lang)}`);
       lines.push(`    ${r.patient}: ${step.appointment.patientName}`);
-      lines.push(`    ${t.call.reference}: ${step.appointment.reference}`);
+      if (step.appointment.reference) {
+        lines.push(`    ${t.call.reference}: ${step.appointment.reference}`);
+      }
     }
   }
 

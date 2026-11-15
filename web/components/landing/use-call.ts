@@ -28,13 +28,13 @@ export type CallErrorKind = 'micDenied' | 'noMic' | 'connection' | 'busy' | 'age
 export interface CallStep {
   step:
     | 'availability_checked'
-    | 'phone_verified'
+    | 'phone_checked'
     | 'booked'
     | 'rescheduled'
     | 'cancelled'
     | 'callback';
   appointment?: {
-    reference: string;
+    reference?: string;
     doctorBn: string;
     doctorEn: string;
     slotStart: string;
@@ -50,7 +50,7 @@ export interface TranscriptLine {
 
 const STEPS: CallStep['step'][] = [
   'availability_checked',
-  'phone_verified',
+  'phone_checked',
   'booked',
   'rescheduled',
   'cancelled',
