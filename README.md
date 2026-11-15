@@ -336,10 +336,12 @@ proof.
   many real front desks. The page is therefore never sent the booking
   reference for an appointment found by phone number, only for one booked on
   the same call. Next: a one-time code by SMS before a change or cancellation.
-- **Doctors are not notified automatically.** The portal offers a calendar
-  file (.ics) for each booked appointment, which staff add to the doctor's
-  calendar. Email or SMS to the doctor needs a paid sending service, which
-  was outside the budget for this task. Next: a calendar integration.
+- **Doctors are not notified automatically.** On a booked appointment the
+  portal has a "Notify the doctor manually" button. It opens the staff
+  member's own mail app with the appointment details written out; they pick
+  the doctor's address and send it. Sending email or SMS from the app needs a
+  paid sending service, which was outside the budget for this task. Next: a
+  calendar integration and automatic messages.
 - **Single clinic.** Clinic facts, doctors and slot hours are constants in
   `clinic.ts`. There are no doctor schedules, leave or holidays beyond Friday.
   Next: move them to tables the portal can edit.

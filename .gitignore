@@ -12,3 +12,6 @@ HANDOFF.md
 # deployment secrets, filled in by hand
 deploy.env
 deploy-ca.pem
+
+# private interview notes
+prep/
