@@ -29,8 +29,16 @@ const NUMBER_WAIT = { minDelay: 2200, maxDelay: 5000 };
 
 /** True when the receptionist has just asked for a phone number (not when she reads one back). */
 function asksForNumber(text: string) {
-  return /নম্বর|নাম্বার/.test(text) && !/ঠিক/.test(text);
+  // A read-back ends with "ঠিক আছে?" or "ঠিক বলেছি?". The bare word ঠিক is not
+  // enough: "ঠিকমতো বুঝতে পারিনি" is her asking again, and needs the long wait.
+  return /নম্বর|নাম্বার|ডিজিট/.test(text) && !/ঠিক (আছে|বলেছি|তো)/.test(text);
 }
+
+// Experiment switches (branch stt-experiments). Defaults match the submitted agent.
+// NOISE_CANCELLATION=off sends the caller's raw microphone audio to speech
+// recognition, to test whether the noise remover distorts Bangla.
+const NOISE_CANCELLATION = process.env.NOISE_CANCELLATION !== 'off';
+const AGENT_NAME = process.env.AGENT_NAME ?? 'bytevoice-bangla';
 
 const GREETING = `আসসালামু আলাইকুম, ${CLINIC.nameBn} থেকে ${CLINIC.agentNameBn} বলছি। বলুন, আপনাকে কীভাবে সাহায্য করতে পারি?`;
 
@@ -137,10 +145,12 @@ export default defineAgent({
     await session.start({
       agent: createAgent(state, report),
       room: ctx.room,
-      inputOptions: {
-        // Removes background noise and other voices from the caller's audio.
-        noiseCancellation: audioEnhancement({ model: EnhancerModel.QuailVfS }),
-      },
+      inputOptions: NOISE_CANCELLATION
+        ? {
+            // Removes background noise and other voices from the caller's audio.
+            noiseCancellation: audioEnhancement({ model: EnhancerModel.QuailVfS }),
+          }
+        : {},
     });
 
     await ctx.connect();
@@ -153,6 +163,6 @@ export default defineAgent({
 cli.runApp(
   new ServerOptions({
     agent: fileURLToPath(import.meta.url),
-    agentName: 'bytevoice-bangla',
+    agentName: AGENT_NAME,
   }),
 );

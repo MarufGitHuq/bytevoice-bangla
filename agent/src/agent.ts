@@ -154,7 +154,7 @@ export function createAgent(state: CallState, report: (event: ProgressEvent) => 
         2. Ask which day and roughly what time suits them.
         3. Check availability before offering any time. Offer at most three times.
         4. Ask the caller's full name. Say it back exactly as you heard it and ask only whether it is right. Stop there and wait for their answer.
-        5. Ask their mobile number, and add that they can also type it in the box on the page if that is easier. Check what you heard with checkPhoneNumber before you read anything back. Then read it back digit by digit and wait for them to confirm.
+        5. Ask their mobile number. Ask them to say it in Bangla, one digit at a time ("শূন্য, এক, সাত..."), and add that they can also type it in the box on the page. Speech recognition hears Bangla digit words better than English ones. If a number comes out short, ask for it again in Bangla digits, slowly, or typed. Check what you heard with checkPhoneNumber before you read anything back. Then read it back digit by digit and wait for them to confirm.
         6. Repeat the doctor, day and time, and wait for a clear yes.
         7. Only then book. Afterwards confirm in one sentence, and ask if they need anything else.
 
