@@ -40,6 +40,15 @@ const en = {
     typeLabel: 'Type a message to Mitu',
     typePlaceholder: 'Type your name or phone number here…',
     send: 'Send',
+    keypad: {
+      open: 'Open the number keypad',
+      close: 'Close the number keypad',
+      title: 'Mobile number keypad',
+      hint: 'Tap your mobile number',
+      wrongStart: 'A mobile number starts with 013 to 019.',
+      backspace: 'Delete the last digit',
+      send: 'Send',
+    },
     progress: 'Done so far',
     steps: {
       availability_checked: 'Free times checked',
@@ -151,6 +160,15 @@ const bn: Copy = {
     typeLabel: 'মিতুকে লিখে জানান',
     typePlaceholder: 'নাম বা ফোন নম্বর লিখেও দিতে পারেন…',
     send: 'পাঠান',
+    keypad: {
+      open: 'নম্বরের কিপ্যাড খুলুন',
+      close: 'নম্বরের কিপ্যাড বন্ধ করুন',
+      title: 'মোবাইল নম্বরের কিপ্যাড',
+      hint: 'মোবাইল নম্বর চাপুন',
+      wrongStart: 'মোবাইল নম্বর ০১৩ থেকে ০১৯ দিয়ে শুরু হয়।',
+      backspace: 'শেষের ডিজিট মুছুন',
+      send: 'পাঠান',
+    },
     progress: 'এ পর্যন্ত যা হয়েছে',
     steps: {
       availability_checked: 'খালি সময় দেখা হয়েছে',
